@@ -1,5 +1,7 @@
 # mcp-server-webdriver
 
+![mcp-server-webdriver](mcp-server-webdriver.svg)
+
 MCP Server that lets AI agents control a real web browser via **Selenium WebDriver** (Firefox + geckodriver).  
 Built with [FastMCP](https://gofastmcp.com).
 

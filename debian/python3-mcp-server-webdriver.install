@@ -1,1 +1,3 @@
 server.py usr/lib/python3/dist-packages/mcp_server_webdriver/
+debian/mcp-server-webdriver.metainfo.xml usr/share/metainfo/
+mcp-server-webdriver.svg usr/share/icons/hicolor/scalable/apps/
