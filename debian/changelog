@@ -1,8 +1,52 @@
-mcp-server-webdriver (0.3.0-1) UNRELEASED; urgency=low
+mcp-server-webdriver (0.5.1-1) trixie; urgency=medium
 
+  * Update documentation with use cases and tool descriptions
+
+ -- vitex <info@vitexsoftware.cz>  Sun, 21 Jun 2026 17:17:07 +0200
+
+mcp-server-webdriver (0.5.0-1) trixie; urgency=medium
+
+  * Add 8 new tools for everyday browser use
+  * browser_scroll: scroll page to coords, by offset, or element into
+    view
+  * browser_press_key: send enter/tab/escape/arrow/f-keys
+  * browser_hover: mouse hover for :hover states and dropdown menus
+  * browser_find_elements: enumerate all elements matching a CSS
+    selector
+  * browser_accept_dialog / browser_dismiss_dialog: JS
+    alert/confirm/prompt
+  * browser_get_cookies / browser_set_cookie: cookie inspection and
+    injection
+  * browser_open: URL is now optional (default about:blank)
+  * browser_navigate / browser_open: auto-prepend https:// to bare
+    hostnames
+  * browser_execute_js: return JSON-serialised result instead of str()
+  * browser_wait: add condition param
+    (visible/clickable/present/text:<str>)
+  * devtools_network_all: add limit= parameter to cap context-window
+    size
+
+ -- vitex <info@vitexsoftware.cz>  Sun, 21 Jun 2026 17:11:24 +0200
+
+mcp-server-webdriver (0.4.0-1) trixie; urgency=low
+
+  [ Vítězslav Dvořák ]
   * Initial Debian packaging
   * WebDriver BiDi support for JS errors, console, network monitoring
   * DevTools diagnostic tools for AI-assisted web development
   * gecko-driver from repo.vitexsoftware.com as default geckodriver source
 
- -- Vítězslav Dvořák <info@vitexsoftware.cz>  Sat, 20 Jun 2026 08:35:42 +0000
+  [ vitex ]
+  * Add --help / -h flag with full tool and env-var reference
+  * Add Firefox profile support: -P <name> and --profile <path> CLI
+    flags
+  * Fix ctx.state -> ctx.lifespan_context for FastMCP 2.x compatibility
+  * Fix geckodriver system PATH resolution returning real path instead
+    of None
+  * Fix BiDi network module attribute error not to disable console/JS
+    capture
+  * Add manpage: debian/mcp-server-webdriver.1
+  * Add unit test suite: tests/test_server.py (13 unit + 9 integration
+    tests)
+
+ -- vitex <info@vitexsoftware.cz>  Sun, 21 Jun 2026 17:02:56 +0200

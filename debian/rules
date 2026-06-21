@@ -5,4 +5,4 @@ export PYBUILD_NAME=mcp-server-webdriver
 	dh $@ --with python3 --buildsystem=pybuild
 
 override_dh_auto_test:
-	# Skip tests - test dependencies not packaged
+	cd $(CURDIR) && python3 -m pytest tests/ -m "not integration" -q

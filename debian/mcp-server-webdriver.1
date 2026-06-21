@@ -1,0 +1,374 @@
+.TH MCP\-SERVER\-WEBDRIVER 1 "2026-06-21" "0.5.0" "User Commands"
+.SH NAME
+mcp\-server\-webdriver \- MCP server for AI\-assisted browser automation via Selenium WebDriver
+.SH SYNOPSIS
+.B mcp\-server\-webdriver
+[\fIOPTIONS\fR]
+.SH DESCRIPTION
+.B mcp\-server\-webdriver
+is a Model Context Protocol (MCP) server that exposes Firefox browser
+automation as tools for AI assistants such as Claude.
+It eliminates the need to manually copy\-paste browser DevTools output by
+giving the assistant direct access to:
+.IP \(bu 4
+JavaScript exceptions (type, message, file, line, column, stack trace)
+.IP \(bu 4
+Console output (\fBconsole.log\fR / \fBwarn\fR / \fBerror\fR / \fBinfo\fR / \fBdebug\fR)
+.IP \(bu 4
+Failed network resources \(em broken CSS, JS, images, fonts (4xx\|/\|5xx\|/\|DNS)
+.IP \(bu 4
+Slow resources (configurable threshold, default 2000\~ms)
+.IP \(bu 4
+Full\-page screenshots for layout and CSS regression diagnosis
+.IP \(bu 4
+Computed CSS on any element
+.IP \(bu 4
+DOM structure of any element (outerHTML)
+.PP
+Communication is over \fBstdin\fR/\fBstdout\fR using the MCP protocol (JSON\-RPC 2.0
+with Content\-Length framing).
+The server is launched automatically by the MCP client; it is not normally
+invoked by hand.
+.PP
+DevTools capture requires the W3C WebDriver BiDi protocol, supported by
+Firefox with geckodriver \(>= 0.34.
+.SH OPTIONS
+.TP
+.B \-P \fIprofile\fR
+Start Firefox with the named profile \fIprofile\fR.
+Equivalent to setting \fBFIREFOX_PROFILE\fR=\fIprofile\fR in the environment.
+.TP
+.B \-\-profile \fIpath\fR
+Start Firefox using the profile directory at \fIpath\fR.
+Equivalent to setting \fBFIREFOX_PROFILE_DIR\fR=\fIpath\fR in the environment.
+If both \fB\-\-profile\fR and \fB\-P\fR are given, \fB\-\-profile\fR takes precedence.
+.TP
+.BR \-h ", " \-\-help
+Print a summary of usage and available tools, then exit.
+.SH TOOLS
+The server exposes 37 MCP tools grouped by category.
+.SS Session management
+.TP
+.B browser_open
+Open Firefox.
+The \fIurl\fR parameter is optional (default: \fBabout:blank\fR).
+Bare hostnames (e.g. \fIexample.com\fR) are accepted; \fBhttps://\fR is prepended
+automatically.
+Accepts \fIheadless\fR (default true), \fIenable_bidi\fR (default true),
+\fIgeckodriver_log\fR, and \fIfirefox_binary\fR parameters.
+.TP
+.B browser_close
+Close the browser session and discard all buffered DevTools data.
+.TP
+.B browser_status
+Return session state, geckodriver source/version, BiDi status, and
+buffer counts as JSON.
+.SS Navigation
+.TP
+.B browser_navigate
+Navigate to a URL.
+Bare hostnames get \fBhttps://\fR prepended automatically.
+.TP
+.B browser_back
+Navigate back in history.
+.TP
+.B browser_forward
+Navigate forward in history.
+.TP
+.B browser_refresh
+Reload the current page.
+.SS Page inspection
+.TP
+.B browser_screenshot
+Capture a PNG screenshot of the full page, or of a specific element
+when a CSS selector is given.
+.TP
+.B browser_get_title
+Return the current page \fB<title>\fR.
+.TP
+.B browser_get_url
+Return the current URL.
+.TP
+.B browser_get_source
+Return the full HTML source of the current page.
+.TP
+.B browser_get_text
+Return visible text content, optionally scoped to a CSS selector.
+.TP
+.B browser_get_attribute
+Return the value of an HTML attribute on a matched element.
+.TP
+.B browser_find_elements
+Return a list of all elements matching a CSS selector.
+Each entry includes: index, tag, text, id, class, href, src, value,
+type, name, aria_label, visible.
+Accepts an optional \fIlimit\fR parameter (default 50).
+.SS Interaction
+.TP
+.B browser_click
+Click an element identified by a CSS selector.
+.TP
+.B browser_fill
+Type text into an input field.
+The field is cleared first by default (\fIclear_first\fR=true).
+.TP
+.B browser_select
+Choose an option in a \fB<select>\fR dropdown by visible text, value, or index.
+.TP
+.B browser_execute_js
+Execute JavaScript and return the result as JSON (falls back to string
+for non-serialisable values).
+.TP
+.B browser_wait
+Wait until an element satisfies a condition.
+The \fIcondition\fR parameter accepts:
+\fBvisible\fR (default), \fBclickable\fR, \fBpresent\fR, or \fBtext:\fR\fIstring\fR.
+.TP
+.B browser_scroll
+Scroll the page or an element.
+Pass a CSS selector to scroll that element into view.
+Pass \fIx\fR/\fIy\fR to jump to absolute scroll coordinates.
+Pass \fIby\fR=true with \fIx\fR/\fIy\fR to scroll relative to the current position.
+.TP
+.B browser_press_key
+Send a keyboard key to an element or the active element.
+Supported keys: \fBenter\fR, \fBtab\fR, \fBescape\fR, \fBspace\fR, \fBbackspace\fR,
+\fBdelete\fR, \fBhome\fR, \fBend\fR, \fBpageup\fR, \fBpagedown\fR,
+\fBarrowup\fR/\fBdown\fR/\fBleft\fR/\fBright\fR (also: \fBup\fR/\fBdown\fR/\fBleft\fR/\fBright\fR),
+\fBf1\fR\(en\fBf12\fR.
+.TP
+.B browser_hover
+Move the mouse over an element.
+Triggers CSS \fB:hover\fR states and \fBmouseenter\fR/\fBmouseover\fR event listeners —
+essential for dropdown menus and tooltips.
+.TP
+.B browser_switch_frame
+Switch the WebDriver context into an \fB<iframe>\fR or back to the main document.
+.SS Dialogs and cookies
+.TP
+.B browser_accept_dialog
+Accept (click OK) a JavaScript \fBalert()\fR, \fBconfirm()\fR, or \fBprompt()\fR.
+.TP
+.B browser_dismiss_dialog
+Dismiss (click Cancel) a JavaScript \fBconfirm()\fR or \fBprompt()\fR.
+.TP
+.B browser_get_cookies
+Return all cookies for the current page as a list of dicts.
+.TP
+.B browser_set_cookie
+Set a cookie on the current page.
+Useful for injecting auth tokens or session cookies without a login flow.
+.SS DevTools (require BiDi)
+BiDi listeners are attached automatically when \fBbrowser_open\fR is called
+with \fIenable_bidi\fR=true (the default).
+.TP
+.B devtools_report
+The primary diagnostic tool.
+Returns a complete report in a single call: JavaScript exceptions,
+console errors and warnings, failed/broken network resources, and slow
+requests.
+Equivalent to reading the Console and Network tabs in DevTools simultaneously.
+Accepts an optional \fIsince\fR ISO\~8601 timestamp to filter entries.
+.TP
+.B devtools_js_errors
+Return buffered JavaScript exceptions only.
+.TP
+.B devtools_console
+Return buffered console output.
+Accepts an optional \fIlevel\fR filter (log, warn, error, info, debug).
+.TP
+.B devtools_network_failed
+Return failed or slow network resources (4xx, 5xx, DNS errors, connection failures).
+.TP
+.B devtools_network_all
+Return all captured network requests.
+Accepts \fIresource_type\fR, \fImin_status\fR, \fIslow_ms\fR, \fIsince\fR,
+and \fIlimit\fR filters.
+Use \fIlimit\fR on busy pages to avoid overwhelming the context window.
+.TP
+.B devtools_clear
+Clear all buffered console, JS error, and network entries.
+Call this before navigating to a new page to get a clean baseline.
+.TP
+.B devtools_enable_bidi
+Attach (or re\-attach) BiDi event listeners to the running session.
+.TP
+.B devtools_computed_css
+Return computed (final applied) CSS properties for an element.
+Useful for diagnosing hidden elements, wrong colours, or broken layouts.
+.TP
+.B devtools_element_info
+Return detailed element info: outerHTML, bounding box, visibility,
+viewport position, all HTML attributes, ARIA properties, and text content.
+.TP
+.B devtools_css_variables
+Return CSS custom properties (\fB\-\-var\fR) defined on \fB:root\fR.
+Useful for diagnosing missing design tokens or failed stylesheet loads.
+.SH ENVIRONMENT
+.TP
+.B GECKODRIVER_PATH
+Absolute path to the \fBgeckodriver\fR binary.
+Takes highest priority over PATH lookup and auto\-download.
+.TP
+.B GECKODRIVER_AUTO_INSTALL
+Set to \fBfalse\fR to disable automatic geckodriver download via
+\fBwebdriver\-manager\fR.
+Default: \fBtrue\fR.
+.TP
+.B FIREFOX_BINARY
+Path to a custom Firefox executable.
+.TP
+.B FIREFOX_PROFILE
+Named Firefox profile to use (same as \fB\-P\fR).
+.TP
+.B FIREFOX_PROFILE_DIR
+Profile directory path (same as \fB\-\-profile\fR).
+Takes precedence over \fBFIREFOX_PROFILE\fR when both are set.
+.SH GECKODRIVER RESOLUTION
+The server searches for \fBgeckodriver\fR in this order (first match wins):
+.IP 1. 4
+\fBGECKODRIVER_PATH\fR environment variable
+.IP 2. 4
+System \fBPATH\fR \(em install with
+\fBapt install gecko\-driver\fR from \fIhttp://repo.vitexsoftware.com\fR
+.IP 3. 4
+\fBwebdriver\-manager\fR auto\-download (if \fBGECKODRIVER_AUTO_INSTALL\fR \(!= \fBfalse\fR)
+.SH USE CASES
+The following scenarios illustrate the tool sequences an AI assistant uses
+in practice.
+.SS Debug a broken page
+The assistant runs \fBdevtools_report\fR after navigating — the single call
+returns JavaScript exceptions, console errors, and failed network resources
+simultaneously, equivalent to reading the Console and Network tabs in
+DevTools.
+.PP
+.RS
+.EX
+browser_open
+browser_navigate  url=/dashboard
+devtools_report
+browser_screenshot
+.EE
+.RE
+.SS Diagnose a CSS layout problem
+.RS
+.EX
+browser_open
+browser_navigate  url=/checkout
+browser_screenshot
+devtools_computed_css  selector=button#pay  properties=display,visibility,z-index
+devtools_css_variables  prefix=--color
+devtools_network_failed
+.EE
+.RE
+.SS Automate a login flow
+.RS
+.EX
+browser_open
+browser_navigate  url=/login
+browser_fill      selector=#username  value=admin
+browser_fill      selector=#password  value=secret
+browser_press_key key=enter
+browser_wait      selector=#dashboard  condition=visible
+browser_screenshot
+devtools_report
+.EE
+.RE
+.SS Inject a session cookie to bypass login
+.RS
+.EX
+browser_open
+browser_navigate  url=/
+browser_set_cookie  name=session  value=<token>
+browser_navigate  url=/admin
+browser_screenshot
+.EE
+.RE
+.SS Interact with a hover dropdown menu
+.RS
+.EX
+browser_hover     selector=.nav-products
+browser_wait      selector=.dropdown-menu  condition=visible
+browser_find_elements  selector=.dropdown-menu a
+browser_click     selector=.dropdown-menu a:nth-child(3)
+.EE
+.RE
+.SS Scroll to lazy-loaded content
+.RS
+.EX
+browser_open
+browser_navigate  url=/feed
+browser_scroll    by=true  y=1000
+browser_wait      selector=.lazy-card  condition=present
+browser_screenshot
+.EE
+.RE
+.SS Handle a JS confirmation dialog
+.RS
+.EX
+browser_click          selector=#delete-btn
+browser_accept_dialog
+browser_wait           selector=.success  condition=visible
+.EE
+.RE
+.SS Audit page performance
+.RS
+.EX
+browser_open
+browser_navigate  url=/shop
+devtools_network_all  slow_ms=500  limit=20
+.EE
+.RE
+.SH EXAMPLES
+Start the server with a named Firefox profile (session already logged in):
+.PP
+.RS
+.EX
+mcp\-server\-webdriver \-P work
+.EE
+.RE
+.PP
+Start with a profile directory:
+.PP
+.RS
+.EX
+mcp\-server\-webdriver \-\-profile /home/alice/.mozilla/firefox/abc123.dev
+.EE
+.RE
+.PP
+MCP client configuration (\fBclaude_desktop_config.json\fR):
+.PP
+.RS
+.EX
+{
+  "mcpServers": {
+    "webdriver": {
+      "command": "mcp\-server\-webdriver",
+      "args": ["\-P", "work"]
+    }
+  }
+}
+.EE
+.RE
+.PP
+Install geckodriver from the VitexSoftware repository:
+.PP
+.RS
+.EX
+echo "deb http://repo.vitexsoftware.com trixie main" \\
+  | sudo tee /etc/apt/sources.list.d/vitexsoftware.list
+sudo apt update && sudo apt install gecko\-driver
+.EE
+.RE
+.SH SEE ALSO
+.BR firefox (1),
+.BR geckodriver (1),
+.BR python3 (1)
+.PP
+FastMCP documentation: \fIhttps://gofastmcp.com\fR
+.br
+MCP specification: \fIhttps://modelcontextprotocol.io\fR
+.br
+Project repository: \fIhttps://github.com/Vitexus/mcp-server-webdriver\fR
+.SH AUTHOR
+Vítězslav Dvořák <info@vitexsoftware.cz>

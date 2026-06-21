@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcp-server-webdriver"
-version = "0.3.0"
+version = "0.5.0"
 description = "MCP Server for browser automation via Selenium WebDriver + geckodriver (Firefox)"
 readme = "README.md"
 license = { text = "MIT" }
@@ -27,10 +27,12 @@ dev = [
 ]
 
 [project.scripts]
-mcp-server-webdriver = "server:mcp.run"
+mcp-server-webdriver = "server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["server.py"]
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
+markers = [
+    "integration: tests that open a real headless Firefox (require geckodriver on PATH)",
+]

@@ -32,6 +32,7 @@ Install geckodriver:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import shutil
@@ -48,11 +49,14 @@ from fastmcp.utilities.types import Image
 try:
     from selenium import webdriver
     from selenium.webdriver.common.by import By
+    from selenium.webdriver.common.keys import Keys
+    from selenium.webdriver.common.action_chains import ActionChains
     from selenium.webdriver.firefox.options import Options as FirefoxOptions
     from selenium.webdriver.firefox.service import Service as FirefoxService
     from selenium.webdriver.support.ui import WebDriverWait, Select
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.common.exceptions import (
+        NoAlertPresentException,
         NoSuchElementException,
         TimeoutException,
         WebDriverException,
@@ -65,9 +69,11 @@ logger = logging.getLogger("mcp-server-webdriver")
 # ---------------------------------------------------------------------------
 # Env vars
 # ---------------------------------------------------------------------------
-_ENV_GECKODRIVER_PATH = "GECKODRIVER_PATH"
-_ENV_AUTO_INSTALL     = "GECKODRIVER_AUTO_INSTALL"
-_ENV_FIREFOX_BINARY   = "FIREFOX_BINARY"
+_ENV_GECKODRIVER_PATH   = "GECKODRIVER_PATH"
+_ENV_AUTO_INSTALL       = "GECKODRIVER_AUTO_INSTALL"
+_ENV_FIREFOX_BINARY     = "FIREFOX_BINARY"
+_ENV_FIREFOX_PROFILE    = "FIREFOX_PROFILE"      # named profile (-P)
+_ENV_FIREFOX_PROFILE_DIR = "FIREFOX_PROFILE_DIR" # profile path (--profile)
 _REPO_URL             = "http://repo.vitexsoftware.com"
 _REPO_DISTRO          = "trixie"
 _REPO_PKG             = "gecko-driver"
@@ -77,6 +83,41 @@ _DEFAULT_SLOW_MS = 2000
 
 # Resource types that matter for CSS/layout breakage
 _LAYOUT_RESOURCE_TYPES = {"stylesheet", "font", "image", "script", "fetch", "xhr"}
+
+# Friendly key-name → Selenium Keys mapping for browser_press_key
+_KEY_MAP: dict[str, str] = {
+    "enter":       Keys.RETURN,
+    "return":      Keys.RETURN,
+    "tab":         Keys.TAB,
+    "escape":      Keys.ESCAPE,
+    "esc":         Keys.ESCAPE,
+    "space":       Keys.SPACE,
+    "backspace":   Keys.BACK_SPACE,
+    "delete":      Keys.DELETE,
+    "home":        Keys.HOME,
+    "end":         Keys.END,
+    "pageup":      Keys.PAGE_UP,
+    "pagedown":    Keys.PAGE_DOWN,
+    "arrowup":     Keys.ARROW_UP,
+    "arrowdown":   Keys.ARROW_DOWN,
+    "arrowleft":   Keys.ARROW_LEFT,
+    "arrowright":  Keys.ARROW_RIGHT,
+    "up":          Keys.ARROW_UP,
+    "down":        Keys.ARROW_DOWN,
+    "left":        Keys.ARROW_LEFT,
+    "right":       Keys.ARROW_RIGHT,
+    "f1":  Keys.F1,  "f2":  Keys.F2,  "f3":  Keys.F3,  "f4":  Keys.F4,
+    "f5":  Keys.F5,  "f6":  Keys.F6,  "f7":  Keys.F7,  "f8":  Keys.F8,
+    "f9":  Keys.F9,  "f10": Keys.F10, "f11": Keys.F11, "f12": Keys.F12,
+}
+
+
+def _normalise_url(url: str) -> str:
+    """Prepend https:// to bare hostnames so the agent can pass 'example.com'."""
+    url = url.strip()
+    if url and "://" not in url and not url.startswith(("about:", "data:", "file:")):
+        url = "https://" + url
+    return url
 
 
 # ---------------------------------------------------------------------------
@@ -104,7 +145,7 @@ def _resolve_geckodriver() -> tuple[str | None, str]:
     system_path = shutil.which("geckodriver")
     if system_path:
         logger.info("geckodriver: system PATH → %r", system_path)
-        return None, f"system PATH → {system_path}"
+        return system_path, f"system PATH → {system_path}"
 
     auto = os.environ.get(_ENV_AUTO_INSTALL, "true").strip().lower()
     if auto not in ("0", "false", "no"):
@@ -351,7 +392,6 @@ class BrowserState:
             return False
         try:
             scr = self.driver.script
-            net = self.driver.network
 
             # Remove stale handlers
             for attr, remover in (
@@ -368,8 +408,9 @@ class BrowserState:
             self._console_hid = scr.add_console_message_handler(self._console_handler())
             self._error_hid   = scr.add_javascript_error_handler(self._js_error_handler())
 
-            # Network events (BiDi network module)
+            # Network events (BiDi network module — requires Selenium with network BiDi support)
             try:
+                net = self.driver.network
                 self._net_sent_hid = net.add_request_handler(
                     callback=self._net_sent_handler()
                 )
@@ -411,6 +452,16 @@ class BrowserState:
         binary = firefox_binary or os.environ.get(_ENV_FIREFOX_BINARY, "").strip()
         if binary:
             opts.binary_location = binary
+
+        profile_name = os.environ.get(_ENV_FIREFOX_PROFILE, "").strip()
+        profile_dir  = os.environ.get(_ENV_FIREFOX_PROFILE_DIR, "").strip()
+        if profile_dir:
+            opts.profile = profile_dir
+            logger.info("Firefox profile dir: %s", profile_dir)
+        elif profile_name:
+            opts.add_argument("-P")
+            opts.add_argument(profile_name)
+            logger.info("Firefox profile name: %s", profile_name)
 
         svc_kw: dict[str, Any] = {}
         if self.geckodriver_path:
@@ -513,7 +564,7 @@ mcp = FastMCP(
 
 
 def _st(ctx: Context) -> BrowserState:
-    return ctx.state["browser"]  # type: ignore[return-value]
+    return ctx.lifespan_context["browser"]  # type: ignore[return-value]
 
 
 # ===========================================================================
@@ -522,7 +573,7 @@ def _st(ctx: Context) -> BrowserState:
 
 @mcp.tool(annotations={"readOnlyHint": False})
 async def browser_open(
-    url: Annotated[str, "URL to open"],
+    url: Annotated[str, "URL to open (default: about:blank)"] = "about:blank",
     headless: Annotated[bool, "Headless mode (no visible window)"] = True,
     enable_bidi: Annotated[
         bool,
@@ -544,6 +595,7 @@ async def browser_open(
     geckodriver sources (priority order):
       1. GECKODRIVER_PATH env  →  2. apt install gecko-driver  →  3. webdriver-manager
     """
+    url = _normalise_url(url)
     state = _st(ctx)
     state.start(
         headless=headless,
@@ -706,6 +758,7 @@ async def devtools_network_all(
     min_status:    Annotated[int, "Minimum HTTP status to include (e.g. 400). 0 = all."] = 0,
     slow_ms:       Annotated[float, "Include only requests slower than this many ms. 0 = all."] = 0,
     since:         Annotated[str, "ISO 8601 timestamp filter. Empty = all."] = "",
+    limit:         Annotated[int, "Max entries to return (most recent first). 0 = all."] = 0,
     ctx: Context = None,
 ) -> list[dict]:
     """
@@ -713,13 +766,17 @@ async def devtools_network_all(
 
     Useful for auditing which CSS/JS files are loaded, checking API response
     times, or finding resources that are unexpectedly missing from the page.
+    Use limit= to avoid overwhelming the context window on busy pages.
     """
     state = _st(ctx)
     if not state.bidi_enabled:
         raise RuntimeError("BiDi not active — open browser with enable_bidi=True")
-    return state.network_entries(
+    entries = state.network_entries(
         resource_type=resource_type, min_status=min_status, slow_ms=slow_ms, since=since
     )
+    if limit > 0:
+        entries = entries[-limit:]
+    return entries
 
 
 @mcp.tool(annotations={"readOnlyHint": False})
@@ -1053,36 +1110,55 @@ async def browser_execute_js(
     script: Annotated[str, "JavaScript to run in the page context"],
     ctx: Context = None,
 ) -> str:
-    """Execute JavaScript and return the result as a string."""
+    """Execute JavaScript and return the result as JSON (falls back to str for non-serialisable values)."""
     try:
-        return str(_st(ctx).get_driver().execute_script(script))
+        result = _st(ctx).get_driver().execute_script(script)
+        try:
+            return json.dumps(result)
+        except (TypeError, ValueError):
+            return str(result)
     except WebDriverException as exc:
         raise RuntimeError(f"JS failed: {exc}") from exc
 
 
 @mcp.tool(annotations={"readOnlyHint": True})
 async def browser_wait(
-    selector: Annotated[str, "CSS selector to wait for"],
-    timeout:  Annotated[float, "Max seconds to wait"] = 10.0,
+    selector:  Annotated[str, "CSS selector to wait for"],
+    timeout:   Annotated[float, "Max seconds to wait"] = 10.0,
+    condition: Annotated[
+        str,
+        "What to wait for: 'visible' (default), 'clickable', 'present', or 'text:<string>'",
+    ] = "visible",
     ctx: Context = None,
 ) -> str:
-    """Wait until an element is visible on the page."""
+    """Wait until an element satisfies a condition: visible, clickable, present in DOM, or contains text."""
     driver = _st(ctx).get_driver()
+    loc = (By.CSS_SELECTOR, selector)
     try:
-        WebDriverWait(driver, timeout).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, selector))
-        )
-        return f"Element {selector!r} is visible."
+        if condition == "clickable":
+            WebDriverWait(driver, timeout).until(EC.element_to_be_clickable(loc))
+            return f"Element {selector!r} is clickable."
+        elif condition == "present":
+            WebDriverWait(driver, timeout).until(EC.presence_of_element_located(loc))
+            return f"Element {selector!r} is present in DOM."
+        elif condition.startswith("text:"):
+            text = condition[5:]
+            WebDriverWait(driver, timeout).until(EC.text_to_be_present_in_element(loc, text))
+            return f"Element {selector!r} contains text {text!r}."
+        else:  # "visible" (default)
+            WebDriverWait(driver, timeout).until(EC.visibility_of_element_located(loc))
+            return f"Element {selector!r} is visible."
     except TimeoutException:
-        raise RuntimeError(f"Timeout after {timeout}s waiting for {selector!r}")
+        raise RuntimeError(f"Timeout after {timeout}s waiting for {selector!r} ({condition})")
 
 
 @mcp.tool(annotations={"readOnlyHint": False})
 async def browser_navigate(
-    url: Annotated[str, "URL to navigate to"],
+    url: Annotated[str, "URL to navigate to (bare hostnames get https:// prepended)"],
     ctx: Context = None,
 ) -> str:
     """Navigate to a URL in the existing session (keeps BiDi listeners active)."""
+    url = _normalise_url(url)
     try:
         _st(ctx).get_driver().get(url)
         return f"Navigated to: {url}"
@@ -1128,7 +1204,323 @@ async def browser_switch_frame(
         raise RuntimeError(f"Frame not found: {selector!r}")
 
 
+@mcp.tool(annotations={"readOnlyHint": False})
+async def browser_scroll(
+    selector: Annotated[str, "CSS selector — scroll this element into view. Empty = scroll the page."] = "",
+    x:        Annotated[int, "Horizontal scroll position in px (page scroll, ignored when selector given)"] = 0,
+    y:        Annotated[int, "Vertical scroll position in px (page scroll, ignored when selector given)"] = 0,
+    by:       Annotated[bool, "If true, scroll BY (x, y) relative to current position instead of TO (x, y)"] = False,
+    ctx: Context = None,
+) -> str:
+    """
+    Scroll the page or scroll an element into view.
+
+    • Pass a CSS selector to scroll that element into view (smoothly).
+    • Pass x/y to jump the page to absolute scroll coordinates.
+    • Pass by=true with x/y to scroll relative to the current position (e.g. y=500 scrolls down 500 px).
+    • No arguments scrolls to the top of the page.
+    """
+    driver = _st(ctx).get_driver()
+    if selector:
+        try:
+            el = driver.find_element(By.CSS_SELECTOR, selector)
+            driver.execute_script("arguments[0].scrollIntoView({behavior:'smooth', block:'center'});", el)
+            return f"Scrolled {selector!r} into view."
+        except NoSuchElementException:
+            raise RuntimeError(f"Element not found: {selector!r}")
+    elif by:
+        driver.execute_script("window.scrollBy(arguments[0], arguments[1]);", x, y)
+        return f"Scrolled by ({x}, {y})."
+    else:
+        driver.execute_script("window.scrollTo(arguments[0], arguments[1]);", x, y)
+        return f"Scrolled to ({x}, {y})."
+
+
+@mcp.tool(annotations={"readOnlyHint": False})
+async def browser_press_key(
+    key:      Annotated[str, "Key name: enter, tab, escape, space, backspace, delete, "
+                             "home, end, pageup, pagedown, arrowup/down/left/right, f1-f12"],
+    selector: Annotated[str, "CSS selector of element to send the key to. Empty = active element."] = "",
+    ctx: Context = None,
+) -> str:
+    """
+    Send a keyboard key press to an element or the currently focused element.
+
+    Useful for submitting forms (enter), moving focus (tab), closing modals (escape),
+    or triggering keyboard-driven UI components.
+    """
+    driver = _st(ctx).get_driver()
+    key_value = _KEY_MAP.get(key.lower())
+    if key_value is None:
+        raise RuntimeError(
+            f"Unknown key {key!r}. Supported: {', '.join(sorted(_KEY_MAP))}"
+        )
+    if selector:
+        try:
+            driver.find_element(By.CSS_SELECTOR, selector).send_keys(key_value)
+        except NoSuchElementException:
+            raise RuntimeError(f"Element not found: {selector!r}")
+    else:
+        driver.switch_to.active_element.send_keys(key_value)
+    return f"Pressed {key!r}" + (f" on {selector!r}" if selector else " on active element.")
+
+
+@mcp.tool(annotations={"readOnlyHint": True})
+async def browser_hover(
+    selector: Annotated[str, "CSS selector of element to hover over"],
+    ctx: Context = None,
+) -> str:
+    """
+    Move the mouse over an element (hover).
+
+    Triggers CSS :hover states and any mouseenter/mouseover event listeners —
+    essential for dropdown menus, tooltips, and hover-activated controls.
+    """
+    driver = _st(ctx).get_driver()
+    try:
+        el = driver.find_element(By.CSS_SELECTOR, selector)
+        ActionChains(driver).move_to_element(el).perform()
+        return f"Hovering over {selector!r}."
+    except NoSuchElementException:
+        raise RuntimeError(f"Element not found: {selector!r}")
+    except WebDriverException as exc:
+        raise RuntimeError(f"Hover failed: {exc}") from exc
+
+
+@mcp.tool(annotations={"readOnlyHint": True})
+async def browser_find_elements(
+    selector: Annotated[str, "CSS selector"],
+    limit:    Annotated[int, "Max elements to return"] = 50,
+    ctx: Context = None,
+) -> list[dict]:
+    """
+    Return a list of all elements matching a CSS selector.
+
+    Each entry contains: index, tag, text (first 200 chars), id, class,
+    href, src, value, type, name, visible, and aria-label.
+
+    Useful for enumerating links, buttons, inputs, or any repeated component.
+    """
+    driver = _st(ctx).get_driver()
+    elements = driver.find_elements(By.CSS_SELECTOR, selector)[:limit]
+    result = []
+    for i, el in enumerate(elements):
+        try:
+            cs = driver.execute_script("return window.getComputedStyle(arguments[0]);", el)
+            visible = el.is_displayed()
+        except WebDriverException:
+            visible = False
+        result.append({
+            "index":      i,
+            "tag":        el.tag_name,
+            "text":       (el.text or "")[:200],
+            "id":         el.get_attribute("id") or "",
+            "class":      el.get_attribute("class") or "",
+            "href":       el.get_attribute("href") or "",
+            "src":        el.get_attribute("src") or "",
+            "value":      el.get_attribute("value") or "",
+            "type":       el.get_attribute("type") or "",
+            "name":       el.get_attribute("name") or "",
+            "aria_label": el.get_attribute("aria-label") or "",
+            "visible":    visible,
+        })
+    return result
+
+
+@mcp.tool(annotations={"readOnlyHint": False})
+async def browser_accept_dialog(
+    ctx: Context = None,
+) -> str:
+    """
+    Accept (click OK on) a JavaScript dialog: alert(), confirm(), or prompt().
+
+    Call this when a browser action triggers a dialog that blocks further interaction.
+    """
+    driver = _st(ctx).get_driver()
+    try:
+        alert = driver.switch_to.alert
+        text = alert.text
+        alert.accept()
+        return f"Accepted dialog: {text!r}"
+    except NoAlertPresentException:
+        raise RuntimeError("No dialog is currently open.")
+
+
+@mcp.tool(annotations={"readOnlyHint": False})
+async def browser_dismiss_dialog(
+    ctx: Context = None,
+) -> str:
+    """
+    Dismiss (click Cancel on) a JavaScript confirm() or prompt() dialog,
+    or close an alert().
+    """
+    driver = _st(ctx).get_driver()
+    try:
+        alert = driver.switch_to.alert
+        text = alert.text
+        alert.dismiss()
+        return f"Dismissed dialog: {text!r}"
+    except NoAlertPresentException:
+        raise RuntimeError("No dialog is currently open.")
+
+
+@mcp.tool(annotations={"readOnlyHint": True})
+async def browser_get_cookies(
+    ctx: Context = None,
+) -> list[dict]:
+    """
+    Return all cookies for the current page as a list of dicts.
+
+    Each entry: name, value, domain, path, secure, httpOnly, expiry.
+    Useful for inspecting authentication state or session tokens.
+    """
+    return _st(ctx).get_driver().get_cookies()
+
+
+@mcp.tool(annotations={"readOnlyHint": False})
+async def browser_set_cookie(
+    name:   Annotated[str, "Cookie name"],
+    value:  Annotated[str, "Cookie value"],
+    domain: Annotated[str, "Cookie domain (default: current page domain)"] = "",
+    path:   Annotated[str, "Cookie path"] = "/",
+    secure: Annotated[bool, "Secure flag"] = False,
+    ctx: Context = None,
+) -> str:
+    """
+    Set a cookie on the current page.
+
+    Useful for injecting auth tokens or session cookies without going through
+    a login flow. The browser must already be on a page in the target domain.
+    """
+    driver = _st(ctx).get_driver()
+    cookie: dict[str, Any] = {"name": name, "value": value, "path": path, "secure": secure}
+    if domain:
+        cookie["domain"] = domain
+    driver.add_cookie(cookie)
+    return f"Set cookie {name!r}."
+
+
 # ===========================================================================
 
-if __name__ == "__main__":
+_HELP = """\
+mcp-server-webdriver — MCP server for AI-assisted browser automation
+
+USAGE
+  mcp-server-webdriver [OPTIONS]   Start the MCP server (stdio transport)
+  mcp-server-webdriver --help      Show this message
+
+OPTIONS
+  -P <profile>       Start Firefox with a named profile
+  --profile <path>   Start Firefox with a profile directory at <path>
+
+DESCRIPTION
+  Exposes Firefox browser automation as MCP tools so an AI assistant can
+  inspect JavaScript errors, console output, failed network resources,
+  take screenshots, read DOM/CSS, and interact with web pages — without
+  the user manually copy-pasting DevTools output.
+
+  Communication is over stdin/stdout using the MCP protocol (JSON-RPC).
+  Add it to your MCP client config and it will be launched automatically.
+
+TOOLS (37)
+  Session management:
+    browser_open            Open Firefox (URL optional, default about:blank)
+    browser_close           Close the browser session
+    browser_status          Show session state and geckodriver info
+
+  Navigation & interaction:
+    browser_navigate        Navigate to a URL (bare hostnames get https://)
+    browser_back / forward  History navigation
+    browser_refresh         Reload the current page
+    browser_screenshot      Capture a full-page or element screenshot
+    browser_click           Click an element (CSS selector)
+    browser_fill            Type text into an input (clears first by default)
+    browser_select          Choose a <select> option
+    browser_execute_js      Run JavaScript — returns JSON
+    browser_wait            Wait for visible/clickable/present/text:<str>
+    browser_scroll          Scroll page to coords, by offset, or element into view
+    browser_press_key       Send enter/tab/escape/arrow/f-keys to an element
+    browser_hover           Hover the mouse over an element (:hover / tooltips)
+    browser_switch_frame    Switch into an <iframe>
+
+  Page inspection:
+    browser_get_title       Page title
+    browser_get_url         Current URL
+    browser_get_source      Full page HTML source
+    browser_get_text        Text content of an element
+    browser_get_attribute   Attribute value of an element
+    browser_find_elements   List all elements matching a CSS selector
+
+  Dialogs & cookies:
+    browser_accept_dialog   Accept a JS alert() / confirm() / prompt()
+    browser_dismiss_dialog  Dismiss a JS confirm() / prompt()
+    browser_get_cookies     Read all cookies for the current page
+    browser_set_cookie      Inject a cookie (auth, session tokens)
+
+  DevTools (require BiDi — Firefox + geckodriver ≥ 0.34):
+    devtools_report         Full diagnostics: JS errors + console + network
+    devtools_js_errors      JavaScript exceptions only
+    devtools_console        Console output (log/warn/error/info/debug)
+    devtools_network_failed Failed/slow resources (4xx, 5xx, DNS errors)
+    devtools_network_all    All captured network requests (supports limit=)
+    devtools_clear          Clear buffered DevTools data
+    devtools_enable_bidi    Attach BiDi listeners to a running session
+    devtools_computed_css   Computed CSS properties of an element
+    devtools_element_info   Outer HTML of an element
+    devtools_css_variables  CSS custom properties (--var) in scope
+
+ENVIRONMENT VARIABLES
+  GECKODRIVER_PATH          Absolute path to geckodriver binary
+  GECKODRIVER_AUTO_INSTALL  Set to "false" to disable webdriver-manager fallback
+  FIREFOX_BINARY            Path to a custom Firefox binary
+  FIREFOX_PROFILE           Named Firefox profile (same as -P)
+  FIREFOX_PROFILE_DIR       Profile directory path (same as --profile)
+
+GECKODRIVER RESOLUTION (first match wins)
+  1. GECKODRIVER_PATH env variable
+  2. System PATH  (apt install gecko-driver from {repo})
+  3. webdriver-manager auto-download (if GECKODRIVER_AUTO_INSTALL != false)
+
+INSTALL GECKODRIVER (Debian/Ubuntu)
+  echo "deb {repo} trixie main" | sudo tee /etc/apt/sources.list.d/vitexsoftware.list
+  sudo apt update && sudo apt install gecko-driver
+
+MCP CLIENT CONFIG EXAMPLE (claude_desktop_config.json)
+  {{
+    "mcpServers": {{
+      "webdriver": {{
+        "command": "mcp-server-webdriver",
+        "args": ["-P", "myprofile"]
+      }}
+    }}
+  }}
+""".format(repo=_REPO_URL)
+
+
+def main() -> None:
+    import sys
+    args = sys.argv[1:]
+
+    if "--help" in args or "-h" in args:
+        print(_HELP, end="")
+        raise SystemExit(0)
+
+    i = 0
+    while i < len(args):
+        if args[i] == "-P" and i + 1 < len(args):
+            os.environ[_ENV_FIREFOX_PROFILE] = args[i + 1]
+            i += 2
+        elif args[i].startswith("-P") and len(args[i]) > 2:
+            os.environ[_ENV_FIREFOX_PROFILE] = args[i][2:]
+            i += 1
+        elif args[i] == "--profile" and i + 1 < len(args):
+            os.environ[_ENV_FIREFOX_PROFILE_DIR] = args[i + 1]
+            i += 2
+        else:
+            i += 1
+
     mcp.run()
+
+
+if __name__ == "__main__":
+    main()
