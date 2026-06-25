@@ -1,3 +1,10 @@
+mcp-server-webdriver (0.5.1-6) trixie; urgency=medium
+
+  * debian/Jenkinsfile: drop ubuntu:resolute — python3-jsonref not
+    installable (python3-fastmcp dep chain broken on resolute)
+
+ -- vitex <info@vitexsoftware.cz>  Thu, 25 Jun 2026 14:03:12 +0200
+
 mcp-server-webdriver (0.5.1-5) trixie; urgency=medium
 
   * tests/conftest.py: skip TestToolCount when fastmcp is stubbed — the test
