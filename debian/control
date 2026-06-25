@@ -6,7 +6,8 @@ Build-Depends: debhelper-compat (= 13),
                dh-python,
                pybuild-plugin-pyproject,
                python3-all,
-               python3-hatchling
+               python3-hatchling,
+               python3-pytest
 Standards-Version: 4.6.2
 Homepage: https://github.com/Vitexus/mcp-server-webdriver
 Vcs-Git: https://github.com/Vitexus/mcp-server-webdriver.git

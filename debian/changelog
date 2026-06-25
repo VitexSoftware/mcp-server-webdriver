@@ -1,3 +1,10 @@
+mcp-server-webdriver (0.5.1-2) trixie; urgency=medium
+
+  * Add python3-pytest to Build-Depends (fixes build failure: No module named pytest)
+  * Fix pyproject.toml version to match debian/changelog (0.5.0 → 0.5.1)
+
+ -- Vítězslav Dvořák <info@vitexsoftware.cz>  Wed, 25 Jun 2026 13:45:00 +0200
+
 mcp-server-webdriver (0.5.1-1) trixie; urgency=medium
 
   * Update documentation with use cases and tool descriptions
