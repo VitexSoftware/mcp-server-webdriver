@@ -1,3 +1,12 @@
+mcp-server-webdriver (0.5.1-4) trixie; urgency=medium
+
+  * tests/conftest.py: stub fastmcp when not installed so unit tests run
+    without the full opentelemetry/importlib_metadata dep chain in Build-Depends
+  * debian/control: drop python3-fastmcp, python3-importlib-metadata from
+    Build-Depends (no longer needed); keep python3-selenium for geckodriver tests
+
+ -- Vítězslav Dvořák <info@vitexsoftware.cz>  Wed, 25 Jun 2026 14:10:00 +0200
+
 mcp-server-webdriver (0.5.1-3) trixie; urgency=medium
 
   * Add python3-fastmcp and python3-selenium to Build-Depends (fixes
