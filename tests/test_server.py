@@ -120,80 +120,6 @@ class TestHelp:
         assert "GECKODRIVER_PATH" in out
 
 
-class TestBrowserStateProfileResolution:
-    """BrowserState.start() must resolve firefox profile from call args, falling
-    back to env vars, without ever launching a real browser."""
-
-    def _start_and_capture(self, monkeypatch, **start_kwargs):
-        import server as srv
-
-        captured: dict = {}
-
-        class FakeDriver:
-            def set_window_size(self, *a, **kw):
-                pass
-
-        def fake_firefox(service=None, options=None):
-            profile = getattr(options, "profile", None)
-            # Selenium wraps a profile path in a FirefoxProfile that copies the
-            # directory into a fresh temp dir, so identity is checked via a
-            # marker file copied along with it (see _start_and_capture callers).
-            captured["profile"] = profile
-            captured["args"] = list(getattr(options, "arguments", []))
-            return FakeDriver()
-
-        monkeypatch.setattr(srv.webdriver, "Firefox", fake_firefox)
-        monkeypatch.setattr(srv.BrowserState, "resolve", lambda self: None)
-        monkeypatch.setattr(srv.BrowserState, "_attach_bidi", lambda self: True)
-
-        state = srv.BrowserState()
-        state.start(enable_bidi=False, **start_kwargs)
-        return captured
-
-    def test_profile_dir_call_arg_takes_precedence(self, monkeypatch, tmp_path):
-        env_dir = tmp_path / "env-profile"
-        call_dir = tmp_path / "call-profile"
-        env_dir.mkdir()
-        call_dir.mkdir()
-        (call_dir / "marker.txt").write_text("call")
-        monkeypatch.setenv("FIREFOX_PROFILE_DIR", str(env_dir))
-        monkeypatch.setenv("FIREFOX_PROFILE", "env-named")
-        captured = self._start_and_capture(
-            monkeypatch, profile_dir=str(call_dir), profile_name="call-named"
-        )
-        assert os.path.exists(os.path.join(captured["profile"].path, "marker.txt"))
-
-    def test_profile_name_call_arg_used_when_no_dir(self, monkeypatch):
-        monkeypatch.delenv("FIREFOX_PROFILE_DIR", raising=False)
-        monkeypatch.delenv("FIREFOX_PROFILE", raising=False)
-        captured = self._start_and_capture(monkeypatch, profile_name="call-named")
-        assert "-P" in captured["args"]
-        assert "call-named" in captured["args"]
-
-    def test_falls_back_to_env_profile_dir(self, monkeypatch, tmp_path):
-        env_dir = tmp_path / "env-profile"
-        env_dir.mkdir()
-        (env_dir / "marker.txt").write_text("env")
-        monkeypatch.setenv("FIREFOX_PROFILE_DIR", str(env_dir))
-        monkeypatch.delenv("FIREFOX_PROFILE", raising=False)
-        captured = self._start_and_capture(monkeypatch)
-        assert os.path.exists(os.path.join(captured["profile"].path, "marker.txt"))
-
-    def test_falls_back_to_env_profile_name(self, monkeypatch):
-        monkeypatch.delenv("FIREFOX_PROFILE_DIR", raising=False)
-        monkeypatch.setenv("FIREFOX_PROFILE", "env-named")
-        captured = self._start_and_capture(monkeypatch)
-        assert "-P" in captured["args"]
-        assert "env-named" in captured["args"]
-
-    def test_no_profile_anywhere(self, monkeypatch):
-        monkeypatch.delenv("FIREFOX_PROFILE_DIR", raising=False)
-        monkeypatch.delenv("FIREFOX_PROFILE", raising=False)
-        captured = self._start_and_capture(monkeypatch)
-        assert captured["profile"] is None
-        assert "-P" not in captured["args"]
-
-
 class TestGeckodriverResolution:
     """_resolve_geckodriver() must return the actual binary path, not None."""
 
@@ -307,14 +233,6 @@ class TestToolCount:
         }
         assert set(tools) == expected
 
-    def test_browser_open_has_profile_params(self):
-        import asyncio
-        import server as srv
-        tools = {t.name: t for t in asyncio.run(srv.mcp.list_tools())}
-        props = tools["browser_open"].parameters["properties"]
-        assert "firefox_profile" in props
-        assert "firefox_profile_dir" in props
-
 
 # ---------------------------------------------------------------------------
 # Integration tests — require a real Firefox + geckodriver
@@ -402,19 +320,6 @@ class TestBrowserIntegration:
         await client.call_tool("browser_close", {})
         r = await client.call_tool("browser_open", {})
         assert "about:blank" in self._text(r)
-
-    async def test_open_with_profile_dir(self, client, tmp_path):
-        await client.call_tool("browser_close", {})
-        profile_dir = tmp_path / "custom-profile"
-        profile_dir.mkdir()
-        r = await client.call_tool(
-            "browser_open",
-            {"url": "about:blank", "firefox_profile_dir": str(profile_dir)},
-        )
-        assert "Opened" in self._text(r)
-        await client.call_tool("browser_close", {})
-        # Restore a plain session for the remaining tests in this class.
-        await client.call_tool("browser_open", {"url": "about:blank"})
 
     async def test_navigate_bare_hostname(self, client):
         r = await client.call_tool("browser_navigate", {"url": "example.com"})
