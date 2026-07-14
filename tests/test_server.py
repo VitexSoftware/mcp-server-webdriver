@@ -234,6 +234,34 @@ class TestToolCount:
         assert set(tools) == expected
 
 
+class TestBrowserOpenHasNoProfileParams:
+    """browser_open must never accept a per-call Firefox profile param.
+
+    A firefox_profile/firefox_profile_dir tool param was prototyped and
+    deliberately reverted: it would let an agent (or a prompt injected via a
+    visited page) request the user's real, logged-in Firefox profile at
+    runtime with no human gate. Profile selection must stay a server-launch
+    -time-only setting (-P/--profile CLI flags or FIREFOX_PROFILE/
+    FIREFOX_PROFILE_DIR env vars). See AGENTS.md.
+    """
+
+    def test_no_profile_params_on_tool(self):
+        import asyncio
+        import server as srv
+        tools = {t.name: t for t in asyncio.run(srv.mcp.list_tools())}
+        props = tools["browser_open"].parameters["properties"]
+        assert "firefox_profile" not in props
+        assert "firefox_profile_dir" not in props
+        assert "profile" not in props
+
+    def test_start_signature_has_no_profile_params(self):
+        import inspect
+        import server as srv
+        params = inspect.signature(srv.BrowserState.start).parameters
+        assert "profile_name" not in params
+        assert "profile_dir" not in params
+
+
 # ---------------------------------------------------------------------------
 # Integration tests — require a real Firefox + geckodriver
 # ---------------------------------------------------------------------------

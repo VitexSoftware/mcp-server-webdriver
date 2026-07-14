@@ -235,6 +235,13 @@ Configure the server with a named profile that already has your session:
 The browser starts with your existing cookies, saved passwords, and extensions.
 Ask: *"Check my GitHub notifications."* — no login step needed.
 
+Profile selection is intentionally a server-launch-time setting (`-P`/`--profile`
+flags or `FIREFOX_PROFILE`/`FIREFOX_PROFILE_DIR` env vars) rather than a
+`browser_open` tool parameter. That keeps the choice to expose a real,
+logged-in profile to an agent in the hands of whoever configures the MCP
+client — not something an agent (or a prompt injected via a visited page)
+can request at runtime.
+
 ---
 
 ### Audit network performance

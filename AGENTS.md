@@ -51,6 +51,8 @@ The entire server is a single file: `server.py`. There are no submodules.
 
 **`main()`** — parses `-P <profile>` and `--profile <path>` flags by setting `FIREFOX_PROFILE` / `FIREFOX_PROFILE_DIR` env vars, then calls `mcp.run()`.
 
+**Deliberately no per-call profile override** — `browser_open` does not (and should not) accept a profile parameter. A per-call `firefox_profile`/`firefox_profile_dir` tool param was prototyped and rejected: it would let an agent — or a prompt injected via a visited page — request the user's real, logged-in Firefox profile at runtime with no human gate. Profile selection stays a server-launch-time-only setting (CLI flags / env vars), which requires the person configuring the MCP client to opt in explicitly. `TestBrowserOpenHasNoProfileParams` in `tests/test_server.py` guards against silently reintroducing this.
+
 ### geckodriver resolution
 
 `_resolve_geckodriver()` returns `(path | None, description)` using priority order:
