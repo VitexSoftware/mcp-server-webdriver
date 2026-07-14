@@ -235,6 +235,23 @@ Configure the server with a named profile that already has your session:
 The browser starts with your existing cookies, saved passwords, and extensions.
 Ask: *"Check my GitHub notifications."* — no login step needed.
 
+You can also pick the profile per call instead of fixing it at server startup,
+by passing `firefox_profile` (named, like `-P`) or `firefox_profile_dir`
+(a profile directory path, like `--profile`) to `browser_open`:
+
+Ask: *"Open my `work` Firefox profile and check GitHub notifications."*
+
+1. `browser_open(firefox_profile="work")`
+2. `browser_navigate("https://github.com/notifications")`
+
+`firefox_profile_dir` takes precedence over `firefox_profile` if both are
+given, and both override the server's `FIREFOX_PROFILE` / `FIREFOX_PROFILE_DIR`
+env vars for that call. Selenium copies the profile into a temp directory
+before launching, so it never locks or modifies your original profile — safe
+to use even while your everyday Firefox window is open. Only takes effect on
+the first `browser_open` of a session (`browser_close` first to switch
+profiles mid-session).
+
 ---
 
 ### Audit network performance
@@ -253,7 +270,7 @@ Ask: *"Which resources on /shop are slowest to load?"*
 
 | Tool | Description |
 |---|---|
-| `browser_open` | Open Firefox (URL optional, default `about:blank`); accepts `width`, `height`, `user_agent` for mobile emulation |
+| `browser_open` | Open Firefox (URL optional, default `about:blank`); accepts `width`, `height`, `user_agent` for mobile emulation, and `firefox_profile` / `firefox_profile_dir` to use a specific profile for this session |
 | `browser_close` | Quit the browser session |
 | `browser_status` | Session state, geckodriver version, BiDi status, current viewport size, buffer counts |
 | `browser_set_viewport` | Resize the viewport mid-session (e.g. 390×844 for iPhone 14) |

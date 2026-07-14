@@ -51,6 +51,8 @@ The entire server is a single file: `server.py`. There are no submodules.
 
 **`main()`** — parses `-P <profile>` and `--profile <path>` flags by setting `FIREFOX_PROFILE` / `FIREFOX_PROFILE_DIR` env vars, then calls `mcp.run()`.
 
+**Per-call profile override** — `BrowserState.start()` also accepts `profile_name`/`profile_dir` args (wired from `browser_open`'s `firefox_profile`/`firefox_profile_dir` tool params). These take precedence over the `FIREFOX_PROFILE`/`FIREFOX_PROFILE_DIR` env vars when non-empty, but only apply on the first `browser_open` of a session since `start()` is a no-op once `self.driver` is set.
+
 ### geckodriver resolution
 
 `_resolve_geckodriver()` returns `(path | None, description)` using priority order:
@@ -60,7 +62,7 @@ The entire server is a single file: `server.py`. There are no submodules.
 
 ### Tool categories (43 total)
 
-- **Session**: `browser_open` (accepts `width`, `height`, `user_agent` for mobile emulation), `browser_close`, `browser_status`, `browser_set_viewport`
+- **Session**: `browser_open` (accepts `width`, `height`, `user_agent` for mobile emulation, plus `firefox_profile` / `firefox_profile_dir` for a per-call Firefox profile), `browser_close`, `browser_status`, `browser_set_viewport`
 - **Navigation**: `browser_navigate`, `browser_back`, `browser_forward`, `browser_refresh`
 - **Interaction**: `browser_click`, `browser_fill`, `browser_upload_file`, `browser_select`, `browser_execute_js`, `browser_wait`, `browser_scroll`, `browser_press_key`, `browser_hover`, `browser_switch_frame`
 - **Inspection**: `browser_screenshot`, `browser_get_title`, `browser_get_url`, `browser_get_source`, `browser_get_text`, `browser_get_attribute`, `browser_find_elements`

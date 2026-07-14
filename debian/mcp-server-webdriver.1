@@ -1,4 +1,4 @@
-.TH MCP\-SERVER\-WEBDRIVER 1 "2026-06-25" "0.6.0" "User Commands"
+.TH MCP\-SERVER\-WEBDRIVER 1 "2026-07-14" "0.7.0" "User Commands"
 .SH NAME
 mcp\-server\-webdriver \- MCP server for AI\-assisted browser automation via Selenium WebDriver
 .SH SYNOPSIS
@@ -46,7 +46,7 @@ If both \fB\-\-profile\fR and \fB\-P\fR are given, \fB\-\-profile\fR takes prece
 .BR \-h ", " \-\-help
 Print a summary of usage and available tools, then exit.
 .SH TOOLS
-The server exposes 38 MCP tools grouped by category.
+The server exposes 43 MCP tools grouped by category.
 .SS Session management
 .TP
 .B browser_open
@@ -60,6 +60,10 @@ Pass \fIwidth\fR and \fIheight\fR (in pixels) to start the session at a specific
 viewport size for responsive testing (e.g. width=390 height=844 for iPhone 14).
 Pass \fIuser_agent\fR to override the browser User\-Agent string so that
 UA\-sniffing sites serve their mobile layout.
+Pass \fIfirefox_profile\fR (named, like \fB\-P\fR) or \fIfirefox_profile_dir\fR
+(path, like \fB\-\-profile\fR) to select a Firefox profile for this call,
+overriding \fBFIREFOX_PROFILE\fR/\fBFIREFOX_PROFILE_DIR\fR for the session.
+Only takes effect on the first \fBbrowser_open\fR of a session.
 .TP
 .B browser_close
 Close the browser session and discard all buffered DevTools data.

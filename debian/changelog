@@ -1,3 +1,11 @@
+mcp-server-webdriver (0.7.0-1) trixie; urgency=medium
+
+  * browser_open: add firefox_profile / firefox_profile_dir params to select
+    a Firefox profile per call (overrides FIREFOX_PROFILE / FIREFOX_PROFILE_DIR
+    env vars for that session; still only applies on the first browser_open)
+
+ -- vitex <info@vitexsoftware.cz>  Tue, 14 Jul 2026 12:00:00 +0200
+
 mcp-server-webdriver (0.6.0-3) trixie; urgency=medium
 
   * Fix indefinite hang: set default 60s timeout on Selenium

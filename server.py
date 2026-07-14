@@ -451,6 +451,8 @@ class BrowserState:
         width: int = 0,
         height: int = 0,
         user_agent: str = "",
+        profile_name: str | None = None,
+        profile_dir: str | None = None,
     ) -> None:
         if self.driver is not None:
             return
@@ -468,8 +470,8 @@ class BrowserState:
         if binary:
             opts.binary_location = binary
 
-        profile_name = os.environ.get(_ENV_FIREFOX_PROFILE, "").strip()
-        profile_dir  = os.environ.get(_ENV_FIREFOX_PROFILE_DIR, "").strip()
+        profile_name = (profile_name or "").strip() or os.environ.get(_ENV_FIREFOX_PROFILE, "").strip()
+        profile_dir  = (profile_dir or "").strip() or os.environ.get(_ENV_FIREFOX_PROFILE_DIR, "").strip()
         if profile_dir:
             opts.profile = profile_dir
             logger.info("Firefox profile dir: %s", profile_dir)
@@ -608,6 +610,18 @@ async def browser_open(
         "E.g. 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
         "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'",
     ] = "",
+    firefox_profile: Annotated[
+        str,
+        "Named Firefox profile to launch with (same as -P NAME on the CLI). "
+        "Selenium copies the profile into a temp dir before launching, so it does not "
+        "lock or modify the original — safe to use even while your real Firefox is open. "
+        "The session will have that profile's cookies, saved logins, and history.",
+    ] = "",
+    firefox_profile_dir: Annotated[
+        str,
+        "Absolute path to a Firefox profile directory to launch with (same as --profile PATH "
+        "on the CLI). Takes precedence over firefox_profile if both are given.",
+    ] = "",
     ctx: Context = None,
 ) -> str:
     """
@@ -625,6 +639,12 @@ async def browser_open(
       width=768  height=1024  — iPad
       width=1280 height=800   — laptop
 
+    To use your real Firefox profile (saved logins/cookies/history) for this
+    session, pass firefox_profile="name" or firefox_profile_dir="/path/to/profile".
+    Overrides the server's FIREFOX_PROFILE / FIREFOX_PROFILE_DIR env vars for
+    this call. Only takes effect on the first browser_open of a session — it
+    has no effect if a browser is already running (browser_close first).
+
     geckodriver sources (priority order):
       1. GECKODRIVER_PATH env  →  2. apt install gecko-driver  →  3. webdriver-manager
     """
@@ -638,6 +658,8 @@ async def browser_open(
         width=width,
         height=height,
         user_agent=user_agent,
+        profile_name=firefox_profile or None,
+        profile_dir=firefox_profile_dir or None,
     )
     try:
         state.get_driver().get(url)
@@ -1633,7 +1655,9 @@ DESCRIPTION
 
 TOOLS (43)
   Session management:
-    browser_open            Open Firefox (URL optional, default about:blank)
+    browser_open            Open Firefox (URL optional, default about:blank;
+                             pass firefox_profile / firefox_profile_dir to use
+                             a specific profile for this session)
     browser_close           Close the browser session
     browser_status          Show session state and geckodriver info
     browser_set_viewport    Resize viewport (width×height) for responsive testing
