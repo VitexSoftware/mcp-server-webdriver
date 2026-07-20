@@ -243,6 +243,7 @@ class BrowserState:
     driver: webdriver.Firefox | None = None
     headless: bool = True
     bidi_enabled: bool = False
+    network_bidi_available: bool = False
     geckodriver_path: str | None = None
     geckodriver_source: str = "not resolved yet"
 
@@ -430,8 +431,14 @@ class BrowserState:
                 self._net_fail_hid = net.add_fetch_error_handler(
                     callback=self._net_fail_handler()
                 )
+                self.network_bidi_available = True
             except Exception as exc:  # noqa: BLE001
-                logger.info("Network BiDi handlers not available (%s) — skipping", exc)
+                self.network_bidi_available = False
+                logger.warning(
+                    "Network BiDi handlers not available (%s) — network capture "
+                    "(devtools_network_all/devtools_network_failed/devtools_report) "
+                    "will return empty results", exc
+                )
 
             self.bidi_enabled = True
             logger.info("WebDriver BiDi listeners attached (console + JS errors + network)")
@@ -439,6 +446,7 @@ class BrowserState:
         except Exception as exc:  # noqa: BLE001
             logger.warning("BiDi attach failed: %s", exc)
             self.bidi_enabled = False
+            self.network_bidi_available = False
             return False
 
     # ------------------------------------------------------------------
@@ -644,11 +652,16 @@ async def browser_open(
     except WebDriverException as exc:
         raise RuntimeError(f"Navigation failed: {exc}") from exc
 
-    bidi_note = (
-        " | BiDi active: JS errors + console + network are being captured"
-        if state.bidi_enabled else
-        " | BiDi unavailable — DevTools capture disabled"
-    )
+    if not state.bidi_enabled:
+        bidi_note = " | BiDi unavailable — DevTools capture disabled"
+    elif state.network_bidi_available:
+        bidi_note = " | BiDi active: JS errors + console + network are being captured"
+    else:
+        bidi_note = (
+            " | BiDi active: JS errors + console captured; network capture "
+            "unavailable (selenium network BiDi module missing — "
+            "devtools_network_all/devtools_network_failed/devtools_report will be empty)"
+        )
     viewport_note = f" | viewport: {width}×{height}" if width and height else ""
     return f"Opened: {url}{viewport_note}{bidi_note}"
 
@@ -674,6 +687,7 @@ async def browser_status(ctx: Context = None) -> dict:
         "session_active": state.driver is not None,
         "headless": state.headless,
         "bidi_enabled": state.bidi_enabled,
+        "network_bidi_available": state.network_bidi_available,
         "buffered": {"console": nc, "js_errors": ne, "network": nn},
         "geckodriver_source": state.geckodriver_source,
         "geckodriver_version": _geckodriver_version(gd_bin),
@@ -734,13 +748,20 @@ async def devtools_report(
     if not state.bidi_enabled:
         raise RuntimeError("BiDi not active — open browser with enable_bidi=True")
 
-    return {
+    report: dict[str, Any] = {
         "js_errors": state.js_errors(since=since),
         "console_errors": state.console_entries(level="error", since=since) +
                           state.console_entries(level="warn",  since=since),
         "failed_resources": state.network_entries(failed_only=True, since=since),
         "slow_resources": state.network_entries(slow_ms=_DEFAULT_SLOW_MS, since=since),
     }
+    if not state.network_bidi_available:
+        report["network_capture_unavailable"] = (
+            "selenium network BiDi module missing — failed_resources/slow_resources "
+            "are empty because capture never attached, not because there were no "
+            "failures/slow requests"
+        )
+    return report
 
 
 @mcp.tool(annotations={"readOnlyHint": True})
@@ -811,6 +832,11 @@ async def devtools_network_failed(
     state = _st(ctx)
     if not state.bidi_enabled:
         raise RuntimeError("BiDi not active — open browser with enable_bidi=True")
+    if not state.network_bidi_available:
+        raise RuntimeError(
+            "Network BiDi capture unavailable (selenium network BiDi module missing) "
+            "— results would be empty regardless of actual network activity."
+        )
     return state.network_entries(failed_only=True, resource_type=resource_type, since=since)
 
 
@@ -833,6 +859,11 @@ async def devtools_network_all(
     state = _st(ctx)
     if not state.bidi_enabled:
         raise RuntimeError("BiDi not active — open browser with enable_bidi=True")
+    if not state.network_bidi_available:
+        raise RuntimeError(
+            "Network BiDi capture unavailable (selenium network BiDi module missing) "
+            "— results would be empty regardless of actual network activity."
+        )
     entries = state.network_entries(
         resource_type=resource_type, min_status=min_status, slow_ms=slow_ms, since=since
     )
@@ -869,7 +900,12 @@ async def devtools_enable_bidi(ctx: Context = None) -> str:
         raise RuntimeError(
             "BiDi attachment failed. Ensure geckodriver ≥ 0.34 and Firefox release channel."
         )
-    return "BiDi active: JavaScript errors, console, and network events are now captured."
+    if state.network_bidi_available:
+        return "BiDi active: JavaScript errors, console, and network events are now captured."
+    return (
+        "BiDi active: JavaScript errors and console events are now captured; "
+        "network capture unavailable (selenium network BiDi module missing)."
+    )
 
 
 # ===========================================================================
