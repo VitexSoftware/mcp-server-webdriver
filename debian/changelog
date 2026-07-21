@@ -7,6 +7,14 @@ mcp-server-webdriver (0.6.0-4) trixie; urgency=medium
     FIREFOX_PROFILE/FIREFOX_PROFILE_DIR env vars)
   * Add regression tests + AGENTS.md/README notes documenting the decision so
     it isn't silently reintroduced
+  * Add missing Breaks: alongside Replaces: python3-mcp-server-webdriver
+    (Debian Policy §7.6) so upgrade ordering from the old binary package
+    name is deterministic
+  * Rename debian/python3-mcp-server-webdriver.{install,manpages} to
+    debian/mcp-server-webdriver.{install,manpages}: these per-package
+    debhelper files still carried the pre-rename binary package name, so
+    the metainfo, man page and icon were silently not installed into the
+    current mcp-server-webdriver package at all
 
  -- vitex <info@vitexsoftware.cz>  Tue, 14 Jul 2026 13:00:00 +0200
 
