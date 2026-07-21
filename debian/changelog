@@ -15,6 +15,12 @@ mcp-server-webdriver (0.6.0-4) trixie; urgency=medium
     debhelper files still carried the pre-rename binary package name, so
     the metainfo, man page and icon were silently not installed into the
     current mcp-server-webdriver package at all
+  * tests/conftest.py: also skip test_no_profile_params_on_tool under the
+    fastmcp-stub build environment (only python3-selenium is a
+    Build-Depends, not python3-fastmcp) — it calls mcp.list_tools() same
+    as the already-skipped TestToolCount, and was failing every build
+    since it was added because the stubbed FastMCP() returns a plain
+    MagicMock, not an awaitable
 
  -- vitex <info@vitexsoftware.cz>  Tue, 14 Jul 2026 13:00:00 +0200
 

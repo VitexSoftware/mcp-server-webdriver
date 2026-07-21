@@ -39,6 +39,10 @@ def pytest_collection_modifyitems(config, items):
     if _FASTMCP_REAL:
         return
     skip = pytest.mark.skip(reason="requires real fastmcp installed (stubbed in build env)")
+    stubbed_items = {
+        ("TestToolCount", "test_tool_names"),
+        ("TestBrowserOpenHasNoProfileParams", "test_no_profile_params_on_tool"),
+    }
     for item in items:
-        if item.cls and item.cls.__name__ == "TestToolCount":
+        if item.cls and (item.cls.__name__, item.name) in stubbed_items:
             item.add_marker(skip)
