@@ -1,6 +1,8 @@
 # mcp-server-webdriver
 
 ![mcp-server-webdriver](mcp-server-webdriver.svg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Packaging: deb](https://img.shields.io/badge/packaging-.deb-red?logo=debian&logoColor=white)
 
 MCP Server that lets AI agents control a real web browser via **Selenium WebDriver** (Firefox + geckodriver).  
 Built with [FastMCP](https://gofastmcp.com).
@@ -45,11 +47,17 @@ AI:   browser_open → browser_navigate("/cart")
 
 ```bash
 sudo curl -fsSL http://repo.vitexsoftware.com/KEY.gpg -o /usr/share/keyrings/vitexsoftware-archive-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/vitexsoftware-archive-keyring.gpg] http://repo.vitexsoftware.com trixie main" \
+echo "deb [signed-by=/usr/share/keyrings/vitexsoftware-archive-keyring.gpg] http://repo.vitexsoftware.com trixie main backports" \
   | sudo tee /etc/apt/sources.list.d/vitexsoftware.list
 sudo apt update
-sudo apt install python3-mcp-server-webdriver
+sudo apt install mcp-server-webdriver
 ```
+
+The `backports` component is required, not optional: `python3-mcp` (a
+`python3-fastmcp` dependency) needs `python3-jsonschema >= 4.20.0`, which is
+newer than the version Debian trixie ships in `main` — it's only available
+in `backports`. Without it, `apt install` fails with an unmet-dependency
+error on `python3-jsonschema`.
 
 This installs `gecko-driver`, `python3-selenium`, `python3-fastmcp`, and
 `mcp-server-webdriver` in a single step.

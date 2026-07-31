@@ -918,6 +918,12 @@ async def browser_screenshot(
         str,
         "CSS selector of element to capture. Empty = full page screenshot.",
     ] = "",
+    save_path: Annotated[
+        str,
+        "Optional absolute file path to also write the PNG to disk "
+        "(e.g. for embedding in docs/presentations). Parent directory must "
+        "already exist. Empty = don't save, just return the image inline.",
+    ] = "",
     ctx: Context = None,
 ) -> Image:
     """
@@ -932,10 +938,22 @@ async def browser_screenshot(
     if selector:
         try:
             el = driver.find_element(By.CSS_SELECTOR, selector)
-            return Image(data=el.screenshot_as_png, format="png")
+            png = el.screenshot_as_png
         except NoSuchElementException:
             raise RuntimeError(f"Element not found: {selector!r}")
-    return Image(data=driver.get_screenshot_as_png(), format="png")
+    else:
+        png = driver.get_screenshot_as_png()
+
+    if save_path:
+        if not os.path.isabs(save_path):
+            raise RuntimeError(f"save_path must be an absolute path: {save_path!r}")
+        parent = os.path.dirname(save_path)
+        if parent and not os.path.isdir(parent):
+            raise RuntimeError(f"Parent directory does not exist: {parent!r}")
+        with open(save_path, "wb") as f:
+            f.write(png)
+
+    return Image(data=png, format="png")
 
 
 @mcp.tool(annotations={"readOnlyHint": True})

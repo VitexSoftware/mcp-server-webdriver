@@ -1,3 +1,11 @@
+mcp-server-webdriver (0.6.1-1) trixie; urgency=medium
+
+  * Add optional save_path to browser_screenshot for writing PNG to disk
+  * README: fix apt install package name, note backports component is
+    required for python3-jsonschema
+
+ -- CyberVitexus <cybervitexus@gmail.com>  Fri, 31 Jul 2026 15:40:01 +0200
+
 mcp-server-webdriver (0.6.0-4) trixie; urgency=medium
 
   * Revert per-call Firefox profile selection on browser_open (firefox_profile
