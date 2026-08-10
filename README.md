@@ -289,9 +289,9 @@ Ask: *"Which resources on /shop are slowest to load?"*
 | `browser_screenshot` | Full-page or element PNG screenshot |
 | `browser_get_title` | Current page `<title>` |
 | `browser_get_url` | Current URL |
-| `browser_get_source` | Raw HTML source |
-| `browser_get_text` | Visible text (whole page or CSS selector) |
-| `browser_get_attribute` | Value of an HTML attribute on an element |
+| `browser_get_source` | Raw HTML source (wrapped as untrusted content — see [Security](#security)) |
+| `browser_get_text` | Visible text (whole page or CSS selector; wrapped as untrusted content) |
+| `browser_get_attribute` | Value of an HTML attribute on an element (wrapped as untrusted content) |
 | `browser_find_elements` | List all elements matching a CSS selector |
 
 ### Interaction
@@ -322,8 +322,8 @@ Ask: *"Which resources on /shop are slowest to load?"*
 | Tool | Description |
 |---|---|
 | `devtools_report` | **Main diagnostic tool** — JS errors + console + failed/slow network |
-| `devtools_js_errors` | JavaScript exceptions only |
-| `devtools_console` | Console output (log / warn / error / info / debug) |
+| `devtools_js_errors` | JavaScript exceptions only (entries carry an `untrusted` marker) |
+| `devtools_console` | Console output (log / warn / error / info / debug; entries carry an `untrusted` marker) |
 | `devtools_network_failed` | Failed resources (4xx, 5xx, DNS errors) |
 | `devtools_network_all` | All network requests (supports `limit=` and filters) |
 | `devtools_clear` | Clear buffered DevTools data (use before navigating) |
@@ -331,6 +331,27 @@ Ask: *"Which resources on /shop are slowest to load?"*
 | `devtools_computed_css` | Computed CSS properties of an element |
 | `devtools_element_info` | Bounding box, visibility, attributes, aria, outerHTML |
 | `devtools_css_variables` | CSS custom properties (`--var`) in scope |
+
+---
+
+## Security
+
+Anything a visited page contains — HTML, visible text, attribute values,
+console output, JS error messages, web storage — is attacker-controllable if
+the page is malicious or compromised. Tools that relay this content back to
+the calling agent (`browser_get_source`, `browser_get_text`,
+`browser_get_attribute`, `devtools_console`, `devtools_js_errors`,
+`devtools_report`, `browser_get_storage`) wrap it in an explicit
+`-----BEGIN/END UNTRUSTED CONTENT-----` envelope (or an `untrusted` field on
+structured entries), so an agent has a structural signal that the content is
+data to read, never an instruction to follow — even if it's phrased as one.
+This defends against indirect prompt-injection / agent-hijacking attacks
+delivered via ordinary page content.
+
+This complements the existing Firefox-profile lockdown (see
+[*Use a real Firefox profile*](#use-a-real-firefox-profile-stay-logged-in)):
+both exist because a page — or an instruction injected via one — should never
+be able to silently expand what the agent can do or see.
 
 ---
 
