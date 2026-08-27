@@ -1,3 +1,17 @@
+mcp-server-webdriver (0.7.0-1) trixie; urgency=medium
+
+  * Wrap page-derived tool output
+    (get_source/get_text/get_attribute/get_storage,
+    devtools_console/js_errors/report) as explicit untrusted content so
+    a hijacked agent can't mistake attacker-supplied page text for an
+    instruction
+  * browser_get_storage now returns {warning, entries} instead of a flat
+    dict (breaking change for direct consumers)
+  * Add README Security section; unit tests for the new untrusted-
+    content envelope
+
+ -- CyberVitexus <cybervitexus@gmail.com>  Mon, 10 Aug 2026 18:04:12 +0200
+
 mcp-server-webdriver (0.6.2-1) trixie; urgency=medium
 
   * Add companion package mcprack-mcp-server-webdriver: registers mcp-
