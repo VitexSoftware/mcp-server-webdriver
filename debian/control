@@ -33,3 +33,13 @@ Description: MCP Server for AI-assisted web development via Selenium WebDriver
  .
  Uses the W3C WebDriver BiDi protocol via Firefox + geckodriver.
  gecko-driver is provided by the VitexSoftware APT repository.
+
+Package: mcprack-mcp-server-webdriver
+Architecture: all
+Depends: ${misc:Depends},
+         mcprack (>= 1.5.1),
+         mcp-server-webdriver (= ${binary:Version})
+Description: Registers Selenium WebDriver MCP server into mcprack catalog
+ Companion package for mcp-server-webdriver. Installing it registers
+ the mcp-server-webdriver binary as an available MCP server in the
+ local mcprack instance; removing it unregisters it again.

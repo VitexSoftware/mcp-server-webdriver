@@ -4,5 +4,8 @@ export PYBUILD_NAME=mcp-server-webdriver
 %:
 	dh $@ --with python3 --buildsystem=pybuild
 
+override_dh_auto_install:
+	dh_auto_install --destdir=debian/mcp-server-webdriver
+
 override_dh_auto_test:
 	cd $(CURDIR) && python3 -m pytest tests/ -m "not integration" -q

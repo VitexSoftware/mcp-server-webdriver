@@ -1,3 +1,11 @@
+mcp-server-webdriver (0.6.2-1) trixie; urgency=medium
+
+  * Add companion package mcprack-mcp-server-webdriver: registers mcp-
+    server-webdriver into the local mcprack MCP catalog on install
+    (postinst) and unregisters it on removal (prerm).
+
+ -- vitex <info@vitexsoftware.cz>  Thu, 27 Aug 2026 09:45:35 +0200
+
 mcp-server-webdriver (0.6.1-1) trixie; urgency=medium
 
   * Add optional save_path to browser_screenshot for writing PNG to disk
