@@ -353,6 +353,17 @@ This complements the existing Firefox-profile lockdown (see
 both exist because a page — or an instruction injected via one — should never
 be able to silently expand what the agent can do or see.
 
+The server also defaults to **read-only mode**: page-mutating tools
+(`browser_click`, `browser_fill`, `browser_upload_file`, `browser_select`,
+`browser_execute_js`, `browser_press_key`, `browser_accept_dialog`,
+`browser_dismiss_dialog`, `browser_set_cookie`, `browser_set_storage`,
+`browser_clear_storage`) refuse to run unless `WEBDRIVER_READONLY=false` is
+set. Navigation and session/viewport management (`browser_open`,
+`browser_navigate`, `browser_back`/`forward`/`refresh`, `browser_scroll`,
+`browser_hover`, `browser_wait`, `browser_switch_frame`, `browser_close`,
+`browser_set_viewport`) are unaffected, since they're needed to reach the
+page a read-only session inspects.
+
 ---
 
 ## Environment variables
@@ -364,6 +375,7 @@ be able to silently expand what the agent can do or see.
 | `FIREFOX_BINARY` | _(unset)_ | Path to a custom Firefox executable |
 | `FIREFOX_PROFILE` | _(unset)_ | Named Firefox profile — same as `-P` |
 | `FIREFOX_PROFILE_DIR` | _(unset)_ | Profile directory path — same as `--profile` |
+| `WEBDRIVER_READONLY` | `true` | Set to `false` to allow page-mutating tools (click/fill/upload/select/execute_js/press_key/dialogs/cookies/storage) |
 
 ---
 

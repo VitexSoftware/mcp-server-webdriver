@@ -619,6 +619,27 @@ def _st(ctx: Context) -> BrowserState:
     return ctx.lifespan_context["browser"]  # type: ignore[return-value]
 
 
+def _is_read_only() -> bool:
+    """Defaults to enabled (fail-closed): set WEBDRIVER_READONLY=false to
+    allow page-mutating actions (click/fill/upload/select/execute_js/
+    set_cookie/set_storage/clear_storage/press_key/accept_dialog/
+    dismiss_dialog). Navigation and session/viewport management are
+    unaffected -- they're needed to reach the page a read-only session
+    inspects.
+    """
+    return os.environ.get("WEBDRIVER_READONLY", "true") not in ("0", "false", "False", "")
+
+
+def _require_writable() -> None:
+    if _is_read_only():
+        raise RuntimeError(
+            "This server is running in read-only mode (WEBDRIVER_READONLY=true). "
+            "Set WEBDRIVER_READONLY=false to enable page-mutating actions "
+            "(click/fill/upload/select/execute_js/set_cookie/set_storage/"
+            "clear_storage/press_key/accept_dialog/dismiss_dialog)."
+        )
+
+
 # ===========================================================================
 # SESSION MANAGEMENT
 # ===========================================================================
@@ -1256,6 +1277,7 @@ async def browser_click(
     ctx: Context = None,
 ) -> str:
     """Click an element."""
+    _require_writable()
     driver = _st(ctx).get_driver()
     try:
         driver.find_element(By.CSS_SELECTOR, selector).click()
@@ -1274,6 +1296,7 @@ async def browser_fill(
     ctx: Context = None,
 ) -> str:
     """Type text into an input field."""
+    _require_writable()
     driver = _st(ctx).get_driver()
     try:
         el = driver.find_element(By.CSS_SELECTOR, selector)
@@ -1300,6 +1323,7 @@ async def browser_upload_file(
     hiding the native input and styling a custom button over it).
     The file must exist on the machine running the MCP server.
     """
+    _require_writable()
     driver = _st(ctx).get_driver()
     if not os.path.isfile(path):
         raise RuntimeError(f"File not found: {path!r}")
@@ -1323,6 +1347,7 @@ async def browser_select(
     ctx: Context = None,
 ) -> str:
     """Select an <option> in a <select> dropdown."""
+    _require_writable()
     driver = _st(ctx).get_driver()
     try:
         sel = Select(driver.find_element(By.CSS_SELECTOR, selector))
@@ -1346,6 +1371,7 @@ async def browser_execute_js(
     ctx: Context = None,
 ) -> str:
     """Execute JavaScript and return the result as JSON (falls back to str for non-serialisable values)."""
+    _require_writable()
     try:
         result = _st(ctx).get_driver().execute_script(script)
         try:
@@ -1484,6 +1510,7 @@ async def browser_press_key(
     Useful for submitting forms (enter), moving focus (tab), closing modals (escape),
     or triggering keyboard-driven UI components.
     """
+    _require_writable()
     driver = _st(ctx).get_driver()
     key_value = _KEY_MAP.get(key.lower())
     if key_value is None:
@@ -1570,6 +1597,7 @@ async def browser_accept_dialog(
 
     Call this when a browser action triggers a dialog that blocks further interaction.
     """
+    _require_writable()
     driver = _st(ctx).get_driver()
     try:
         alert = driver.switch_to.alert
@@ -1588,6 +1616,7 @@ async def browser_dismiss_dialog(
     Dismiss (click Cancel on) a JavaScript confirm() or prompt() dialog,
     or close an alert().
     """
+    _require_writable()
     driver = _st(ctx).get_driver()
     try:
         alert = driver.switch_to.alert
@@ -1626,6 +1655,7 @@ async def browser_set_cookie(
     Useful for injecting auth tokens or session cookies without going through
     a login flow. The browser must already be on a page in the target domain.
     """
+    _require_writable()
     driver = _st(ctx).get_driver()
     cookie: dict[str, Any] = {"name": name, "value": value, "path": path, "secure": secure}
     if domain:
@@ -1680,6 +1710,7 @@ async def browser_set_storage(
     Useful for injecting auth tokens, feature flags, or test fixtures
     directly into web storage without going through a login or setup flow.
     """
+    _require_writable()
     driver = _st(ctx).get_driver()
     store = "sessionStorage" if storage.lower().startswith("s") else "localStorage"
     driver.execute_script(f"{store}.setItem(arguments[0], arguments[1]);", key, value)
@@ -1695,6 +1726,7 @@ async def browser_clear_storage(
     """
     Remove one key or clear all entries from localStorage or sessionStorage.
     """
+    _require_writable()
     driver = _st(ctx).get_driver()
     store = "sessionStorage" if storage.lower().startswith("s") else "localStorage"
     if key:

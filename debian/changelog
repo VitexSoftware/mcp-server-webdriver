@@ -1,3 +1,12 @@
+mcp-server-webdriver (0.7.0-2) trixie; urgency=medium
+
+  * Default to read-only mode (WEBDRIVER_READONLY=true): page-mutating
+    tools
+    (click/fill/upload/select/execute_js/press_key/dialogs/cookies/stora
+    ge) now refuse to run unless WEBDRIVER_READONLY=false is set
+
+ -- CyberVitexus <cybervitexus@gmail.com>  Fri, 28 Aug 2026 20:41:03 +0200
+
 mcp-server-webdriver (0.7.0-1) trixie; urgency=medium
 
   * Wrap page-derived tool output

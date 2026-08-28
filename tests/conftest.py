@@ -5,11 +5,14 @@ dependency tree (opentelemetry, importlib_metadata, …) being installed.
 When fastmcp IS installed (dev machine, integration CI), the real modules
 are used and the stubs are never injected.
 """
+import os
 import sys
 from types import ModuleType
 from unittest.mock import MagicMock
 
 import pytest
+
+os.environ.setdefault("WEBDRIVER_READONLY", "false")
 
 _FASTMCP_REAL = True
 
