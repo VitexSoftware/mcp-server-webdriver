@@ -626,8 +626,11 @@ def _is_read_only() -> bool:
     dismiss_dialog). Navigation and session/viewport management are
     unaffected -- they're needed to reach the page a read-only session
     inspects.
+
+    Unset or empty values are treated as read-only (fail-closed).
     """
-    return os.environ.get("WEBDRIVER_READONLY", "true") not in ("0", "false", "False", "")
+    val = os.environ.get("WEBDRIVER_READONLY", "true").strip().lower()
+    return val not in ("0", "false", "no")
 
 
 def _require_writable() -> None:
@@ -644,7 +647,7 @@ def _require_writable() -> None:
 # SESSION MANAGEMENT
 # ===========================================================================
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_open(
     url: Annotated[str, "URL to open (default: about:blank)"] = "about:blank",
     headless: Annotated[bool, "Headless mode (no visible window)"] = True,
@@ -714,7 +717,7 @@ async def browser_open(
     return f"Opened: {url}{viewport_note}{bidi_note}"
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": True, "idempotentHint": True, "openWorldHint": False})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": True, "idempotent_hint": True, "open_world_hint": False})
 async def browser_close(ctx: Context = None) -> str:
     """Close the browser session. All buffered DevTools data is discarded."""
     state = _st(ctx)
@@ -723,7 +726,7 @@ async def browser_close(ctx: Context = None) -> str:
     return f"Closed. Discarded {nc} console, {ne} JS errors, {nn} network entries."
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": False})
 async def browser_status(ctx: Context = None) -> dict:
     """Session state, geckodriver info, BiDi status and buffer sizes."""
     state = _st(ctx)
@@ -749,7 +752,7 @@ async def browser_status(ctx: Context = None) -> dict:
     return info
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": False})
 async def browser_set_viewport(
     width:  Annotated[int, "Viewport width in pixels"],
     height: Annotated[int, "Viewport height in pixels"],
@@ -776,7 +779,7 @@ async def browser_set_viewport(
 # DEVTOOLS — primary diagnostic tools
 # ===========================================================================
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def devtools_report(
     since: Annotated[str, "ISO 8601 timestamp — only entries after this. Empty = all."] = "",
     ctx: Context = None,
@@ -815,7 +818,7 @@ async def devtools_report(
     return report
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def devtools_js_errors(
     since: Annotated[str, "ISO 8601 timestamp filter. Empty = all."] = "",
     ctx: Context = None,
@@ -841,7 +844,7 @@ async def devtools_js_errors(
     return state.js_errors(since=since)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def devtools_console(
     level: Annotated[
         str,
@@ -863,7 +866,7 @@ async def devtools_console(
     return state.console_entries(level=level or None, since=since)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def devtools_network_failed(
     resource_type: Annotated[
         str,
@@ -893,7 +896,7 @@ async def devtools_network_failed(
     return state.network_entries(failed_only=True, resource_type=resource_type, since=since)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def devtools_network_all(
     resource_type: Annotated[str, "Type filter: stylesheet/script/image/font/fetch/xhr/''"] = "",
     min_status:    Annotated[int, "Minimum HTTP status to include (e.g. 400). 0 = all."] = 0,
@@ -925,7 +928,7 @@ async def devtools_network_all(
     return entries
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": True, "idempotentHint": True, "openWorldHint": False})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": True, "idempotent_hint": True, "open_world_hint": False})
 async def devtools_clear(ctx: Context = None) -> str:
     """
     Clear all buffered console, JS error, and network entries.
@@ -937,7 +940,7 @@ async def devtools_clear(ctx: Context = None) -> str:
     return f"Cleared: {nc} console entries, {ne} JS errors, {nn} network entries."
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": False})
 async def devtools_enable_bidi(ctx: Context = None) -> str:
     """
     Attach (or re-attach) WebDriver BiDi listeners to the running session.
@@ -965,7 +968,7 @@ async def devtools_enable_bidi(ctx: Context = None) -> str:
 # VISUAL DIAGNOSIS — layout / CSS
 # ===========================================================================
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_screenshot(
     selector: Annotated[
         str,
@@ -1009,7 +1012,7 @@ async def browser_screenshot(
     return Image(data=png, format="png")
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def devtools_computed_css(
     selector:   Annotated[str, "CSS selector of the element to inspect"],
     properties: Annotated[
@@ -1066,7 +1069,7 @@ return result;
     return result
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def devtools_element_info(
     selector: Annotated[str, "CSS selector of the element to inspect"],
     ctx: Context = None,
@@ -1123,7 +1126,7 @@ return {
     return result
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def devtools_css_variables(
     prefix: Annotated[
         str,
@@ -1161,7 +1164,7 @@ return result;
     return _st(ctx).get_driver().execute_script(js, prefix) or {}
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def devtools_performance(
     include_resources: Annotated[
         bool,
@@ -1219,25 +1222,25 @@ return result;
 # STANDARD BROWSER INTERACTION
 # ===========================================================================
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_get_title(ctx: Context = None) -> str:
     """Return the <title> of the current page."""
     return _st(ctx).get_driver().title
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_get_url(ctx: Context = None) -> str:
     """Return the current URL."""
     return _st(ctx).get_driver().current_url
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_get_source(ctx: Context = None) -> str:
     """Return the full HTML source of the current page, wrapped as untrusted content."""
     return _wrap_untrusted(_st(ctx).get_driver().page_source, "full page HTML source")
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_get_text(
     selector: Annotated[str, "CSS selector (empty = whole <body>)"] = "",
     ctx: Context = None,
@@ -1256,7 +1259,7 @@ async def browser_get_text(
     return _wrap_untrusted(text, source)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_get_attribute(
     selector:  Annotated[str, "CSS selector"],
     attribute: Annotated[str, "Attribute name (e.g. 'href', 'src', 'value')"],
@@ -1271,7 +1274,7 @@ async def browser_get_attribute(
     return _wrap_untrusted(val if val is not None else "", f"attribute {attribute!r} on {selector!r}")
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": False, "open_world_hint": True})
 async def browser_click(
     selector: Annotated[str, "CSS selector of element to click"],
     ctx: Context = None,
@@ -1288,7 +1291,7 @@ async def browser_click(
         raise RuntimeError(f"Click failed: {exc}") from exc
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_fill(
     selector:    Annotated[str, "CSS selector of input field"],
     value:       Annotated[str, "Text to type"],
@@ -1310,7 +1313,7 @@ async def browser_fill(
         raise RuntimeError(f"Fill failed: {exc}") from exc
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_upload_file(
     selector: Annotated[str, "CSS selector of the <input type='file'> element"],
     path:     Annotated[str, "Absolute path to the local file to upload"],
@@ -1340,7 +1343,7 @@ async def browser_upload_file(
         raise RuntimeError(f"Upload failed: {exc}") from exc
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_select(
     selector: Annotated[str, "CSS selector of <select> element"],
     value:    Annotated[str, "Option: visible text → value attribute → index"],
@@ -1365,7 +1368,7 @@ async def browser_select(
         raise RuntimeError(f"Select failed: {exc}") from exc
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": True, "idempotentHint": False, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": True, "idempotent_hint": False, "open_world_hint": True})
 async def browser_execute_js(
     script: Annotated[str, "JavaScript to run in the page context"],
     ctx: Context = None,
@@ -1382,7 +1385,7 @@ async def browser_execute_js(
         raise RuntimeError(f"JS failed: {exc}") from exc
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_wait(
     selector:  Annotated[str, "CSS selector to wait for"],
     timeout:   Annotated[float, "Max seconds to wait"] = 10.0,
@@ -1413,7 +1416,7 @@ async def browser_wait(
         raise RuntimeError(f"Timeout after {timeout}s waiting for {selector!r} ({condition})")
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_navigate(
     url: Annotated[str, "URL to navigate to (bare hostnames get https:// prepended)"],
     ctx: Context = None,
@@ -1427,28 +1430,28 @@ async def browser_navigate(
         raise RuntimeError(f"Navigation failed: {exc}") from exc
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": False, "open_world_hint": True})
 async def browser_back(ctx: Context = None) -> str:
     """Navigate back."""
     _st(ctx).get_driver().back()
     return "Navigated back."
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": False, "open_world_hint": True})
 async def browser_forward(ctx: Context = None) -> str:
     """Navigate forward."""
     _st(ctx).get_driver().forward()
     return "Navigated forward."
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_refresh(ctx: Context = None) -> str:
     """Reload the current page."""
     _st(ctx).get_driver().refresh()
     return "Page refreshed."
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_switch_frame(
     selector: Annotated[str, "CSS selector of <iframe>, or '' for main document"] = "",
     ctx: Context = None,
@@ -1465,7 +1468,7 @@ async def browser_switch_frame(
         raise RuntimeError(f"Frame not found: {selector!r}")
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": False, "open_world_hint": True})
 async def browser_scroll(
     selector: Annotated[str, "CSS selector — scroll this element into view. Empty = scroll the page."] = "",
     x:        Annotated[int, "Horizontal scroll position in px (page scroll, ignored when selector given)"] = 0,
@@ -1497,7 +1500,7 @@ async def browser_scroll(
         return f"Scrolled to ({x}, {y})."
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": False, "open_world_hint": True})
 async def browser_press_key(
     key:      Annotated[str, "Key name: enter, tab, escape, space, backspace, delete, "
                              "home, end, pageup, pagedown, arrowup/down/left/right, f1-f12"],
@@ -1527,7 +1530,7 @@ async def browser_press_key(
     return f"Pressed {key!r}" + (f" on {selector!r}" if selector else " on active element.")
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_hover(
     selector: Annotated[str, "CSS selector of element to hover over"],
     ctx: Context = None,
@@ -1549,7 +1552,7 @@ async def browser_hover(
         raise RuntimeError(f"Hover failed: {exc}") from exc
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_find_elements(
     selector: Annotated[str, "CSS selector"],
     limit:    Annotated[int, "Max elements to return"] = 50,
@@ -1588,7 +1591,7 @@ async def browser_find_elements(
     return result
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": False, "open_world_hint": True})
 async def browser_accept_dialog(
     ctx: Context = None,
 ) -> str:
@@ -1608,7 +1611,7 @@ async def browser_accept_dialog(
         raise RuntimeError("No dialog is currently open.")
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": False, "open_world_hint": True})
 async def browser_dismiss_dialog(
     ctx: Context = None,
 ) -> str:
@@ -1627,7 +1630,7 @@ async def browser_dismiss_dialog(
         raise RuntimeError("No dialog is currently open.")
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_get_cookies(
     ctx: Context = None,
 ) -> list[dict]:
@@ -1640,7 +1643,7 @@ async def browser_get_cookies(
     return _st(ctx).get_driver().get_cookies()
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_set_cookie(
     name:   Annotated[str, "Cookie name"],
     value:  Annotated[str, "Cookie value"],
@@ -1664,7 +1667,7 @@ async def browser_set_cookie(
     return f"Set cookie {name!r}."
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": True, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_get_storage(
     storage: Annotated[str, "'local' for localStorage (default) or 'session' for sessionStorage"] = "local",
     key:     Annotated[str, "Specific key to read. Empty = return all entries as a dict."] = "",
@@ -1697,7 +1700,7 @@ return out;
     return {"warning": _UNTRUSTED_NOTICE, "entries": entries}
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": False, "idempotent_hint": True, "open_world_hint": True})
 async def browser_set_storage(
     key:     Annotated[str, "Storage key"],
     value:   Annotated[str, "Value to store"],
@@ -1717,7 +1720,7 @@ async def browser_set_storage(
     return f"Set {store}[{key!r}]."
 
 
-@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": True, "idempotentHint": True, "openWorldHint": True})
+@mcp.tool(annotations={"read_only_hint": False, "destructive_hint": True, "idempotent_hint": True, "open_world_hint": True})
 async def browser_clear_storage(
     storage: Annotated[str, "'local' for localStorage (default) or 'session' for sessionStorage"] = "local",
     key:     Annotated[str, "Specific key to remove. Empty = clear all entries."] = "",

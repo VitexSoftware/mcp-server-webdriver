@@ -266,6 +266,36 @@ class TestToolCount:
         assert set(tools) == expected
 
 
+class TestWebdriverReadonly:
+    """WEBDRIVER_READONLY must fail-closed and guard mutating tools."""
+
+    def test_default_is_readonly(self, monkeypatch):
+        import server as srv
+
+        monkeypatch.delenv("WEBDRIVER_READONLY", raising=False)
+        assert srv._is_read_only() is True
+
+    def test_empty_is_fail_closed(self, monkeypatch):
+        import server as srv
+
+        monkeypatch.setenv("WEBDRIVER_READONLY", "")
+        assert srv._is_read_only() is True
+
+    def test_false_allows_writes(self, monkeypatch):
+        import server as srv
+
+        monkeypatch.setenv("WEBDRIVER_READONLY", "false")
+        assert srv._is_read_only() is False
+
+    def test_require_writable_raises(self, monkeypatch):
+        import pytest
+        import server as srv
+
+        monkeypatch.setenv("WEBDRIVER_READONLY", "true")
+        with pytest.raises(RuntimeError, match="read-only"):
+            srv._require_writable()
+
+
 class TestBrowserOpenHasNoProfileParams:
     """browser_open must never accept a per-call Firefox profile param.
 

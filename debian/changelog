@@ -1,3 +1,12 @@
+mcp-server-webdriver (0.7.1-1) trixie; urgency=medium
+
+  * Fail-closed WEBDRIVER_READONLY: empty/unset values stay read-only
+  * Tool annotations use MCP SDK v2 snake_case hints (read_only_hint)
+  * Add tests/live_capability_scenario.py (about:blank read probe;
+    skips gracefully without geckodriver/Firefox)
+
+ -- CyberVitexus <cybervitexus@gmail.com>  Mon, 21 Sep 2026 11:31:28 +0200
+
 mcp-server-webdriver (0.7.0-2) trixie; urgency=medium
 
   * Default to read-only mode (WEBDRIVER_READONLY=true): page-mutating

@@ -375,7 +375,7 @@ page a read-only session inspects.
 | `FIREFOX_BINARY` | _(unset)_ | Path to a custom Firefox executable |
 | `FIREFOX_PROFILE` | _(unset)_ | Named Firefox profile — same as `-P` |
 | `FIREFOX_PROFILE_DIR` | _(unset)_ | Profile directory path — same as `--profile` |
-| `WEBDRIVER_READONLY` | `true` | Set to `false` to allow page-mutating tools (click/fill/upload/select/execute_js/press_key/dialogs/cookies/storage) |
+| `WEBDRIVER_READONLY` | `true` | Set to `false` to allow page-mutating tools (click/fill/upload/select/execute_js/press_key/dialogs/cookies/storage). Empty/unset values stay read-only (fail-closed). |
 
 ---
 
@@ -440,9 +440,18 @@ With a profile directory and explicit geckodriver path:
 # Unit tests only (no browser required):
 pytest tests/ -m "not integration"
 
+# Live capability scenario (opens about:blank when geckodriver+Firefox exist):
+python tests/live_capability_scenario.py
+
 # All tests including browser integration:
 pytest tests/
 ```
+
+The live scenario respects `WEBDRIVER_READONLY=true` (default): mutating tools
+must refuse, while session/read tools open `about:blank`, call
+`browser_status` / `browser_get_title` / `browser_get_url` / `browser_get_source`,
+then `browser_close`. If `/usr/bin/geckodriver` or Firefox is missing, browser
+steps are skipped gracefully (exit 0).
 
 ---
 
